@@ -7,13 +7,12 @@ struct InlineText: View {
   @Environment(\.softBreakMode) private var softBreakMode
   @Environment(\.theme) private var theme
 
-  @State private var inlineImages: [String: Image] = [:]
+  @State private var asyncImages: [String: Image] = [:]
 
   private let inlines: [InlineNode]
 
   init(_ inlines: [InlineNode]) {
     self.inlines = inlines
-    self.inlineImages = self.loadInlineImagesSync()
   }
 
   var body: some View {
@@ -27,23 +26,23 @@ struct InlineText: View {
           strikethrough: self.theme.strikethrough,
           link: self.theme.link
         ),
-        images: self.inlineImages,
+        images: self.allImages,
         softBreakMode: self.softBreakMode,
         attributes: attributes,
         placeholderImage: self.inlineImageProvider.placeholder()
       )
     }
     .task(id: self.inlines) {
-      self.inlineImages = (try? await self.loadInlineImages()) ?? [:]
+      self.asyncImages = (try? await self.loadInlineImages()) ?? [:]
     }
   }
 
-  private func loadInlineImagesSync() -> [String: Image] {
+  private var syncImages: [String: Image] {
     let images = Set(self.inlines.compactMap(\.imageData))
     guard !images.isEmpty else { return [:] }
     let synchronousImages: [(String, Image)] = images.compactMap { imageData in
       guard let url = URL(string: imageData.source, relativeTo: self.imageBaseURL),
-            let image = self.inlineImageProvider.image(with: url, label: imageData.alt) else {
+            let image = self.inlineImageProvider.synchronousImage(with: url, label: imageData.alt) else {
         return nil
       }
       return (imageData.source, image)
@@ -51,8 +50,13 @@ struct InlineText: View {
     return Dictionary(synchronousImages) { first, _ in first }
   }
 
+  private var allImages: [String: Image] {
+    syncImages.merging(self.asyncImages, uniquingKeysWith: { first, _ in first })
+  }
+
   private func loadInlineImages() async throws -> [String: Image] {
-    let images = Set(self.inlines.compactMap(\.imageData).filter { self.inlineImages[$0.source] == nil })
+    let syncImages = self.syncImages
+    let images = Set(self.inlines.compactMap(\.imageData).filter { syncImages[$0.source] == nil })
 
     guard !images.isEmpty else { return [:] }
 
