@@ -33,12 +33,27 @@ struct InlineText: View {
       )
     }
     .task(id: self.inlines) {
+      self.inlineImages = self.loadInlineImagesSync()
       self.inlineImages = (try? await self.loadInlineImages()) ?? [:]
     }
   }
 
-  private func loadInlineImages() async throws -> [String: Image] {
+  private func loadInlineImagesSync() -> [String: Image] {
     let images = Set(self.inlines.compactMap(\.imageData))
+    guard !images.isEmpty else { return [:] }
+    let synchronousImages: [(String, Image)] = images.compactMap { imageData in
+      guard let url = URL(string: imageData.source, relativeTo: self.imageBaseURL),
+            let image = self.inlineImageProvider.image(with: url, label: imageData.alt) else {
+        return nil
+      }
+      return (imageData.source, image)
+    }
+    return Dictionary(uniqueKeysWithValues: synchronousImages)
+  }
+
+  private func loadInlineImages() async throws -> [String: Image] {
+    let images = Set(self.inlines.compactMap(\.imageData).filter { self.inlineImages[$0.source] == nil })
+
     guard !images.isEmpty else { return [:] }
 
     return try await withThrowingTaskGroup(of: (String, Image).self) { taskGroup in
