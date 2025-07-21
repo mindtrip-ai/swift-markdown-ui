@@ -13,6 +13,7 @@ struct InlineText: View {
 
   init(_ inlines: [InlineNode]) {
     self.inlines = inlines
+    self.inlineImages = self.loadInlineImagesSync()
   }
 
   var body: some View {
@@ -33,7 +34,6 @@ struct InlineText: View {
       )
     }
     .task(id: self.inlines) {
-      self.inlineImages = self.loadInlineImagesSync()
       self.inlineImages = (try? await self.loadInlineImages()) ?? [:]
     }
   }
@@ -48,7 +48,7 @@ struct InlineText: View {
       }
       return (imageData.source, image)
     }
-    return Dictionary(uniqueKeysWithValues: synchronousImages)
+    return Dictionary(synchronousImages) { first, _ in first }
   }
 
   private func loadInlineImages() async throws -> [String: Image] {
