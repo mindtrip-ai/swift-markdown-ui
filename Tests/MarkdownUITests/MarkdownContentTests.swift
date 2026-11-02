@@ -384,6 +384,27 @@ final class MarkdownContentTests: XCTestCase {
     XCTAssertEqual(markdown, content.renderMarkdown())
   }
 
+  func testSingleTildeIsNotStrikethrough() {
+    // given
+    let markdown = "~$550 – $680 (~$2,200 base), ~~sold out~~, `~a~`"
+
+    // when
+    let content = MarkdownContent(markdown)
+
+    // then
+    XCTAssertEqual(
+      MarkdownContent {
+        Paragraph {
+          "~$550 – $680 (~$2,200 base), "
+          Strikethrough("sold out")
+          ", "
+          Code("~a~")
+        }
+      },
+      content
+    )
+  }
+
   func testLink() {
     // given
     let markdown = "Hello [world](https://example.com)."
