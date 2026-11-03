@@ -227,9 +227,10 @@ extension UnsafeNode {
   ) rethrows -> ResultType? {
     cmark_gfm_core_extensions_ensure_registered()
 
-    // Create a Markdown parser and attach the GitHub syntax extensions
+    // Create a Markdown parser and attach the GitHub syntax extensions.
+    // Only `~~double~~` tildes strike through, so a lone `~` (as in `~$550`) stays literal.
 
-    let parser = cmark_parser_new(CMARK_OPT_DEFAULT)
+    let parser = cmark_parser_new(CMARK_OPT_DEFAULT | CMARK_OPT_STRIKETHROUGH_DOUBLE_TILDE)
     defer { cmark_parser_free(parser) }
 
     let extensionNames: Set<String>
