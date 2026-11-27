@@ -5,6 +5,7 @@ extension Sequence where Element == InlineNode {
     baseURL: URL?,
     textStyles: InlineTextStyles,
     images: [String: Image],
+    imageBaselineOffsets: [String: CGFloat] = [:],
     softBreakMode: SoftBreak.Mode,
     attributes: AttributeContainer,
     placeholderImage: Text?
@@ -13,6 +14,7 @@ extension Sequence where Element == InlineNode {
       baseURL: baseURL,
       textStyles: textStyles,
       images: images,
+      imageBaselineOffsets: imageBaselineOffsets,
       softBreakMode: softBreakMode,
       attributes: attributes,
       placeholderImage: placeholderImage
@@ -28,6 +30,7 @@ private struct TextInlineRenderer {
   private let baseURL: URL?
   private let textStyles: InlineTextStyles
   private let images: [String: Image]
+  private let imageBaselineOffsets: [String: CGFloat]
   private let softBreakMode: SoftBreak.Mode
   private let attributes: AttributeContainer
   private let placeholderImage: Text?
@@ -37,6 +40,7 @@ private struct TextInlineRenderer {
     baseURL: URL?,
     textStyles: InlineTextStyles,
     images: [String: Image],
+    imageBaselineOffsets: [String: CGFloat],
     softBreakMode: SoftBreak.Mode,
     attributes: AttributeContainer,
     placeholderImage: Text?
@@ -44,6 +48,7 @@ private struct TextInlineRenderer {
     self.baseURL = baseURL
     self.textStyles = textStyles
     self.images = images
+    self.imageBaselineOffsets = imageBaselineOffsets
     self.softBreakMode = softBreakMode
     self.attributes = attributes
     self.placeholderImage = placeholderImage
@@ -65,6 +70,12 @@ private struct TextInlineRenderer {
       self.renderHTML(content)
     case .image(let source, _):
       self.renderImage(source)
+    case .link(let destination, let children) where children.isImagesOnly:
+      // An attributed string has no room for an image, so a link that wraps only images draws them as images,
+      // each carrying the link's destination for a tap handler to find.
+      for case .image(let source, _) in children {
+        self.renderImage(source, linkDestination: destination)
+      }
     default:
       self.defaultRender(inline)
     }
@@ -105,12 +116,22 @@ private struct TextInlineRenderer {
     }
   }
 
-  private mutating func renderImage(_ source: String) {
+  private mutating func renderImage(_ source: String, linkDestination: String? = nil) {
+    var text: Text
     if let image = self.images[source] {
-      self.result = self.result + Text(image)
+      text = Text(image)
+      if let offset = self.imageBaselineOffsets[source] {
+        text = text.baselineOffset(offset)
+      }
     } else if let placeholderImage {
-      self.result = self.result + placeholderImage
+      text = placeholderImage
+    } else {
+      return
     }
+    if #available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *), let linkDestination {
+      text = text.customAttribute(LinkAttribute(urlString: linkDestination))
+    }
+    self.result = self.result + text
   }
 
   private mutating func defaultRender(_ inline: InlineNode) {
@@ -133,4 +154,16 @@ private struct TextInlineRenderer {
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 public struct LinkAttribute: TextAttribute {
   public let urlString: String
+}
+
+extension Sequence where Element == InlineNode {
+  /// Whether every inline is an image, and there is at least one.
+  fileprivate var isImagesOnly: Bool {
+    var hasImage = false
+    for inline in self {
+      guard case .image = inline else { return false }
+      hasImage = true
+    }
+    return hasImage
+  }
 }

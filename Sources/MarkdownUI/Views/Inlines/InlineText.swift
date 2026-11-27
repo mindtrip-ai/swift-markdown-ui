@@ -27,6 +27,7 @@ struct InlineText: View {
           link: self.theme.link
         ),
         images: self.allImages,
+        imageBaselineOffsets: self.imageBaselineOffsets,
         softBreakMode: self.softBreakMode,
         attributes: attributes,
         placeholderImage: self.inlineImageProvider.placeholder()
@@ -48,6 +49,17 @@ struct InlineText: View {
       return (imageData.source, image)
     }
     return Dictionary(synchronousImages) { first, _ in first }
+  }
+
+  private var imageBaselineOffsets: [String: CGFloat] {
+    let offsets: [(String, CGFloat)] = Set(self.inlines.compactMap(\.imageData)).compactMap { imageData in
+      guard let url = URL(string: imageData.source, relativeTo: self.imageBaseURL),
+            let offset = self.inlineImageProvider.baselineOffset(for: url) else {
+        return nil
+      }
+      return (imageData.source, offset)
+    }
+    return Dictionary(offsets) { first, _ in first }
   }
 
   private var allImages: [String: Image] {
