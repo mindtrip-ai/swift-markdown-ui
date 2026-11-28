@@ -16,9 +16,14 @@ public protocol InlineImageProvider {
 
   func synchronousImage(with url: URL, label: String) -> Image?
   func placeholder() -> Text?
+
+  /// How far to raise (or, when negative, lower) the image for the given URL from the text's baseline, which an
+  /// inline image otherwise sits its bottom on. `nil` leaves it there.
+  func baselineOffset(for url: URL) -> CGFloat?
 }
 
 extension InlineImageProvider {
   public func placeholder() -> Text? { nil }
   public func synchronousImage(with url: URL, label: String) -> Image? { nil }
+  public func baselineOffset(for url: URL) -> CGFloat? { nil }
 }
